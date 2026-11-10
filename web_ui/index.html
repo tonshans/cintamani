@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="id" data-theme="terminal">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CINTAMANI // PERSONAL AI BRAIN ENGINE</title>
+    <meta
+      name="description"
+      content="Personal AI Knowledge Graph, Home Server & Cognitive Neo-Brutalism Exploration Dashboard."
+    />
+
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN Runtime for Flexbox, Grid & Layout Classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              canvas: 'var(--bg-canvas)',
+              surface: 'var(--bg-surface)',
+              'surface-elevated': 'var(--bg-surface-elevated)',
+              'neo-border': 'var(--border-color)',
+              'text-main': 'var(--text-main)',
+              'text-muted': 'var(--text-muted)',
+              accent1: 'var(--accent-1)',
+              accent2: 'var(--accent-2)',
+              danger: 'var(--danger)',
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Cognitive Neo-Brutalism Stylesheet -->
+    <link rel="stylesheet" href="/css/brutalist.css" />
+
+    <!-- External Runtime Libraries (Zero Node Build Step) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  </head>
+  <body class="bg-canvas text-text-main font-sans antialiased min-h-screen">
+    <div id="app" class="min-h-screen flex flex-col" style="min-height: 100vh;">
+      <!-- =========================================================
+           TOP COMMAND BAR (The Top Bar Contract)
+           ========================================================= -->
+      <header
+        class="neo-box sticky top-0 z-40 px-4 py-3 flex flex-wrap items-center justify-between gap-4 border-t-0 border-l-0 border-r-0"
+      >
+        <!-- Zone 1: Wordmark & Provider Status -->
+        <div class="flex items-center gap-3">
+          <div class="text-lg font-black tracking-wider uppercase flex items-center gap-2 whitespace-nowrap">
+            <span style="color: var(--accent-1);">CINTAMANI</span>
+            <span class="text-xs font-mono opacity-60">// BRAIN ENGINE</span>
+          </div>
+          <span
+            class="neo-tag text-xs font-mono"
+            :style="{ borderColor: pingData.ollama_reachable ? 'var(--accent-1)' : 'var(--danger)', color: pingData.ollama_reachable ? 'var(--accent-1)' : 'var(--danger)' }"
+          >
+            {{ pingData.llm_provider ? pingData.llm_provider.toUpperCase() : 'LLM' }}:
+            {{ pingData.ollama_reachable ? (pingData.llm_model || 'READY') : 'OFFLINE' }}
+          </span>
+        </div>
+
+        <!-- Zone 2: Global Time Machine & Theme Selector -->
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Time Machine Filter -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-mono font-bold uppercase whitespace-nowrap">TIME:</label>
+            <select
+              v-model="timeFilter.mode"
+              @change="onTimeFilterChange"
+              class="neo-input text-xs font-mono cursor-pointer py-1 px-2"
+            >
+              <option value="all_time">ALL TIME</option>
+              <option value="last_7_days">LAST 7 DAYS</option>
+              <option value="last_30_days">LAST 30 DAYS</option>
+              <option value="this_year">THIS YEAR</option>
+              <option value="custom_range">CUSTOM RANGE</option>
+            </select>
+          </div>
+
+          <!-- Custom Date Range Picker (shown when custom_range) -->
+          <div v-if="timeFilter.mode === 'custom_range'" class="flex items-center gap-1">
+            <input
+              type="date"
+              v-model="timeFilter.start_date"
+              @change="onTimeFilterChange"
+              class="neo-input text-xs font-mono py-1 px-2"
+            />
+            <span class="font-mono text-xs">-</span>
+            <input
+              type="date"
+              v-model="timeFilter.end_date"
+              @change="onTimeFilterChange"
+              class="neo-input text-xs font-mono py-1 px-2"
+            />
+          </div>
+
+          <!-- Theme Selector -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-mono font-bold uppercase whitespace-nowrap">THEME:</label>
+            <select
+              v-model="currentTheme"
+              @change="changeTheme"
+              class="neo-input text-xs font-mono cursor-pointer py-1 px-2"
+            >
+              <option value="terminal">1. TERMINAL (DARK)</option>
+              <option value="draft">2. ARCHITECT (LIGHT)</option>
+              <option value="archive">3. ARCHIVE (LIGHT)</option>
+              <option value="blueprint">4. BLUEPRINT (DARK)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Zone 3: Primary Actions (Settings & Export) -->
+        <div class="flex items-center gap-2">
+          <button
+            @click="openSettings"
+            class="neo-btn text-xs font-mono py-1.5 px-3"
+            title="Kelola API Token & Konfigurasi LLM"
+          >
+            ⚙ CONFIG
+          </button>
+          <button
+            @click="exportBrain"
+            class="neo-btn neo-btn-accent1 text-xs font-mono py-1.5 px-3 whitespace-nowrap"
+            title="Download Full Database Backup"
+          >
+            ⬇ EXPORT MY BRAIN
+          </button>
+        </div>
+      </header>
+
+      <!-- =========================================================
+           MAIN WORKSPACE GRID (Sidebar + Exploration Canvas)
+           ========================================================= -->
+      <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <!-- LEFT DYNAMIC SIDEBAR -->
+        <aside
+          class="w-full md:w-80 flex-shrink-0 p-4 flex flex-col gap-5 overflow-y-auto neo-box border-t-0 border-b-0 border-l-0"
+        >
+          <!-- Primary Navigation Tabs -->
+          <div class="flex flex-col gap-2">
+            <div class="text-xs font-mono font-bold uppercase opacity-60">NAVIGASI INTI</div>
+            <button
+              @click="currentView = 'stream'"
+              :class="['neo-btn w-full text-left text-xs justify-start', currentView === 'stream' ? 'neo-btn-accent1' : '']"
+            >
+              📝 CATATAN MIKRO ({{ totalNotes }})
+            </button>
+            <button
+              @click="currentView = 'insights'"
+              :class="['neo-btn w-full text-left text-xs justify-start', currentView === 'insights' ? 'neo-btn-accent1' : '']"
+            >
+              💡 SAVED INSIGHTS ({{ insightsList.length }})
+            </button>
+            <button
+              @click="openGraphView"
+              :class="['neo-btn w-full text-left text-xs justify-start', currentView === 'graph' ? 'neo-btn-accent1' : '']"
+            >
+              🕸 THOUGHT CONSTELLATION
+            </button>
+          </div>
+
+          <!-- Dynamic Active AI Plugins List -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold uppercase opacity-60">AI EXPLORATIONS</span>
+              <span class="text-xs font-mono opacity-50">{{ activePlugins.length }} PLUGINS</span>
+            </div>
+
+            <div class="flex flex-col gap-2">
+              <div
+                v-for="p in activePlugins"
+                :key="p.plugin_name"
+                class="neo-box-sm p-3 flex flex-col gap-2"
+                :style="{ opacity: p.is_ready ? '1' : '0.65' }"
+              >
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-bold text-xs">{{ p.display_name }}</span>
+                  <span
+                    v-if="p.is_ready"
+                    class="neo-tag text-xs"
+                    style="color: var(--accent-1); border-color: var(--accent-1);"
+                  >
+                    READY
+                  </span>
+                  <span
+                    v-else
+                    class="neo-tag text-xs"
+                    style="color: var(--danger); border-color: var(--danger);"
+                  >
+                    KURANG {{ p.missing_notes_count }}
+                  </span>
+                </div>
+
+                <p class="text-xs opacity-75 line-clamp-2 leading-relaxed">
+                  {{ p.description }}
+                </p>
+
+                <div class="flex items-center justify-between pt-1 border-t border-dashed" style="border-color: var(--border-color);">
+                  <span class="text-xs font-mono opacity-50 uppercase">{{ p.category }}</span>
+                  <button
+                    @click="triggerExplore(p)"
+                    :disabled="!p.is_ready || isJobRunning"
+                    class="neo-btn neo-btn-accent2 text-xs py-1 px-2"
+                  >
+                    EKSPLORASI ➔
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- MAIN VIEWPORT CANVAS -->
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col gap-6">
+          <!-- Active Async Job Banner (when AI is exploring) -->
+          <div v-if="isJobRunning" class="neo-box p-4 neo-btn-accent2 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="animate-spin text-lg">⏳</span>
+              <div>
+                <div class="font-black text-sm uppercase">AI SEDANG MENGEKSPLORASI PEMIKIRAN...</div>
+                <div class="text-xs font-mono">Job ID: {{ activeJobId }} | Plugin: {{ activeJobPlugin }}</div>
+              </div>
+            </div>
+            <div class="text-xs font-mono font-bold uppercase animate-pulse">POLLING STATUS...</div>
+          </div>
+
+          <!-- Alert / Status Banner -->
+          <div v-if="notificationMessage" class="neo-box p-3 flex items-center justify-between" :style="{ backgroundColor: notificationType === 'error' ? 'var(--danger)' : 'var(--accent-1)', color: '#000' }">
+            <span class="text-xs font-bold font-mono">{{ notificationMessage }}</span>
+            <button @click="notificationMessage = ''" class="font-bold text-xs px-2 cursor-pointer">✕</button>
+          </div>
+
+          <!-- =====================================================
+               VIEW 1: MICRO-NOTES STREAM & WEB CAPTURE FORM
+               ===================================================== -->
+          <div v-if="currentView === 'stream'" class="flex flex-col gap-6">
+            <!-- Web Note Capture Form -->
+            <div class="neo-box p-5 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <span class="font-black text-sm uppercase tracking-wide">TANGKAP PEMIKIRAN MIKRO BARU</span>
+                <span class="text-xs font-mono opacity-60">DEVICE: WEB-DASHBOARD</span>
+              </div>
+              <textarea
+                v-model="newNoteContent"
+                rows="3"
+                placeholder="Tuliskan gagasan mentah, pertanyaan reflektif, atau ide yang terlintas saat ini..."
+                class="neo-input w-full resize-y text-sm font-sans"
+              ></textarea>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono opacity-50">
+                  Karakter: {{ newNoteContent.length }} | Sumber: Immutable Source of Truth
+                </span>
+                <button
+                  @click="submitWebNote"
+                  :disabled="!newNoteContent.trim()"
+                  class="neo-btn neo-btn-accent1 text-xs py-2 px-4"
+                >
+                  SIMPAN CATATAN [+]
+                </button>
+              </div>
+            </div>
+
+            <!-- Hybrid Search Bar -->
+            <div class="neo-box p-4 flex flex-col md:flex-row items-center gap-3">
+              <input
+                type="text"
+                v-model="searchQuery"
+                @keyup.enter="performSearch"
+                placeholder="Cari kata kunci eksak (ESP32) atau makna semantik..."
+                class="neo-input flex-1 w-full text-sm font-mono"
+              />
+              <div class="flex items-center gap-2 w-full md:w-auto">
+                <select v-model="searchType" class="neo-input text-xs font-mono py-2">
+                  <option value="hybrid">HYBRID (FTS + SEMANTIK)</option>
+                  <option value="keyword">KEYWORD EKSAK</option>
+                  <option value="semantic">VEKTOR SEMANTIK</option>
+                </select>
+                <button @click="performSearch" class="neo-btn text-xs py-2 px-4 whitespace-nowrap">
+                  🔍 CARI
+                </button>
+                <button v-if="isSearching" @click="resetSearch" class="neo-btn text-xs py-2 px-2">
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <!-- Notes Cards Grid / List -->
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold uppercase opacity-60">
+                  {{ isSearching ? `HASIL PENCARIAN (${searchResults.length})` : `DAFTAR CATATAN (${notesList.length} DARI ${totalNotes})` }}
+                </span>
+                <button @click="loadNotes" class="neo-btn text-xs py-1 px-2 font-mono">
+                  ⟳ REFRESH
+                </button>
+              </div>
+
+              <!-- Notes 2-Column Responsive Grid -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  v-for="n in (isSearching ? searchResults : notesList)"
+                  :key="n.id"
+                  class="neo-box p-5 flex flex-col justify-between gap-4"
+                >
+                  <div class="text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                    {{ n.content }}
+                  </div>
+                  <div class="pt-3 border-t border-dashed flex flex-wrap items-center justify-between gap-2 text-xs font-mono opacity-70" style="border-color: var(--border-color);">
+                    <span>{{ formatTime(n.created_at) }}</span>
+                    <div class="flex items-center gap-2">
+                      <span v-if="n.score !== undefined" class="neo-tag text-xs font-bold" style="color: var(--accent-1);">
+                        SKOR: {{ n.score }}
+                      </span>
+                      <span class="neo-tag text-xs">{{ n.source || 'cintamani-web' }}</span>
+                      <span class="text-xs opacity-50">ID: {{ n.id.slice(0, 8) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="notesList.length === 0 && !isSearching" class="neo-box p-8 text-center opacity-60 text-sm">
+                Belum ada catatan pada periode waktu ini. Tangkap catatan pertama Anda di atas atau sinkronkan dari aplikasi Android.
+              </div>
+            </div>
+          </div>
+
+          <!-- =====================================================
+               VIEW 2: SAVED INSIGHTS & BLACKBOARD
+               ===================================================== -->
+          <div v-if="currentView === 'insights'" class="flex flex-col gap-6">
+            <!-- Filter Tabs -->
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                @click="insightFilter = 'all'; loadInsights()"
+                :class="['neo-btn text-xs py-1.5 px-3', insightFilter === 'all' ? 'neo-btn-accent1' : '']"
+              >
+                SEMUA
+              </button>
+              <button
+                @click="insightFilter = 'accepted'; loadInsights()"
+                :class="['neo-btn text-xs py-1.5 px-3', insightFilter === 'accepted' ? 'neo-btn-accent1' : '']"
+              >
+                ✓ VALID / DITERIMA
+              </button>
+              <button
+                @click="insightFilter = 'pinned'; loadInsights()"
+                :class="['neo-btn text-xs py-1.5 px-3', insightFilter === 'pinned' ? 'neo-btn-accent1' : '']"
+              >
+                📌 PINNED
+              </button>
+              <button
+                @click="insightFilter = 'rejected'; loadInsights()"
+                :class="['neo-btn text-xs py-1.5 px-3', insightFilter === 'rejected' ? 'neo-btn-accent1' : '']"
+              >
+                ✕ DITOLAK
+              </button>
+            </div>
+
+            <!-- Insights List -->
+            <div class="flex flex-col gap-6">
+              <div
+                v-for="ins in insightsList"
+                :key="ins.id"
+                class="neo-box p-6 flex flex-col gap-4"
+              >
+                <!-- Card Header -->
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b pb-3" style="border-color: var(--border-color);">
+                  <div>
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="neo-tag text-xs font-mono" style="color: var(--accent-1); border-color: var(--accent-1);">
+                        {{ ins.plugin_name.toUpperCase() }}
+                      </span>
+                      <span v-if="ins.is_pinned" class="neo-tag text-xs font-bold" style="background-color: var(--accent-2); color: #000;">
+                        📌 PINNED
+                      </span>
+                      <span
+                        v-if="ins.feedback_status !== 'unreviewed'"
+                        class="neo-tag text-xs"
+                        :style="{ color: ins.feedback_status === 'accepted' ? 'var(--accent-1)' : 'var(--danger)' }"
+                      >
+                        STATUS: {{ ins.feedback_status.toUpperCase() }}
+                      </span>
+                    </div>
+                    <h2 class="text-lg font-black uppercase tracking-tight">{{ ins.title }}</h2>
+                  </div>
+
+                  <!-- Provenance & Audit Button -->
+                  <button
+                    @click="openProvenance(ins)"
+                    class="neo-btn text-xs py-1.5 px-3 font-mono"
+                    title="Buka Rekaman Catatan Asli Sumber"
+                  >
+                    🔍 JEJAK AUDIT ({{ ins.source_note_ids.length }} SUMBER)
+                  </button>
+                </div>
+
+                <!-- Markdown Content View -->
+                <div class="markdown-body text-sm" v-html="renderMarkdown(ins.summary_markdown)"></div>
+
+                <!-- Tasks Checklist View (if plugin is task_extractor) -->
+                <div v-if="ins.payload && ins.payload.tasks" class="flex flex-col gap-2 mt-2 pt-3 border-t" style="border-color: var(--border-color);">
+                  <div class="text-xs font-mono font-bold uppercase opacity-60">ACTION ITEMS CHECKLIST:</div>
+                  <div
+                    v-for="(t, idx) in ins.payload.tasks"
+                    :key="idx"
+                    class="neo-box-sm p-3 flex items-start justify-between gap-3"
+                  >
+                    <div class="flex items-start gap-2">
+                      <input type="checkbox" v-model="t.completed" class="mt-1 cursor-pointer" />
+                      <div>
+                        <div :class="['text-xs font-bold', t.completed ? 'line-through opacity-50' : '']">
+                          {{ t.task }}
+                        </div>
+                        <div class="text-xs font-mono opacity-50">
+                          Batas: {{ t.suggested_deadline }} | Sumber: `{{ t.source_note_id }}`
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      class="neo-tag text-xs font-mono font-bold"
+                      :style="{ color: t.urgency === 'high' ? 'var(--danger)' : 'var(--accent-1)' }"
+                    >
+                      {{ (t.urgency || 'MEDIUM').toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Card Footer & Feedback Actions -->
+                <div class="pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs font-mono" style="border-color: var(--border-color);">
+                  <!-- AI Metadata Provenance -->
+                  <div class="opacity-70">
+                    Model: {{ ins.ai_metadata.model_name || 'qwen2.5:7b' }} | Prompt: {{ ins.ai_metadata.prompt_version || 'v1.0' }} | {{ formatTime(ins.created_at) }}
+                  </div>
+
+                  <!-- Feedback Actions -->
+                  <div class="flex items-center gap-2">
+                    <button
+                      @click="submitFeedback(ins.id, 'accepted', null)"
+                      :class="['neo-btn text-xs py-1 px-2.5', ins.feedback_status === 'accepted' ? 'neo-btn-accent1' : '']"
+                    >
+                      ✓ VALID (TERIMA)
+                    </button>
+                    <button
+                      @click="submitFeedback(ins.id, 'rejected', null)"
+                      :class="['neo-btn text-xs py-1 px-2.5', ins.feedback_status === 'rejected' ? 'neo-btn-danger' : '']"
+                    >
+                      ✕ TOLAK
+                    </button>
+                    <button
+                      @click="submitFeedback(ins.id, null, !ins.is_pinned)"
+                      class="neo-btn text-xs py-1 px-2.5"
+                    >
+                      {{ ins.is_pinned ? 'UNPIN' : '📌 PIN' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="insightsList.length === 0" class="neo-box p-8 text-center opacity-60 text-sm">
+                Belum ada Insight pada kategori ini. Pilih salah satu AI Plugin di sidebar untuk memulai eksplorasi baru.
+              </div>
+            </div>
+          </div>
+
+          <!-- =====================================================
+               VIEW 3: THOUGHT CONSTELLATION GRAPH
+               ===================================================== -->
+          <div v-show="currentView === 'graph'" class="flex-1 flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black uppercase tracking-wider">THOUGHT CONSTELLATION (KNOWLEDGE GRAPH)</h2>
+                <div class="text-xs font-mono opacity-60">Visualisasi relasi pemikiran semantik dan evolusi kronologis ide</div>
+              </div>
+              <button @click="loadGraphData" class="neo-btn text-xs py-1 px-3 font-mono">
+                ⟳ RE-LAYOUT
+              </button>
+            </div>
+
+            <div class="flex-1 flex flex-col lg:flex-row gap-4">
+              <!-- Vis Network Canvas Container -->
+              <div
+                id="network-canvas"
+                class="neo-box flex-1 w-full"
+                style="height: 550px; min-height: 550px;"
+              ></div>
+
+              <!-- Selected Node / Edge Details Panel -->
+              <div class="w-full lg:w-80 neo-box p-4 flex flex-col gap-3" style="min-height: 250px;">
+                <span class="text-xs font-mono font-bold uppercase opacity-60">INSPECTOR NODE / RELASI</span>
+                <div v-if="selectedGraphItem" class="flex flex-col gap-2">
+                  <div class="font-bold text-xs uppercase" style="color: var(--accent-1);">
+                    {{ selectedGraphItem.type === 'node' ? 'CATATAN MIKRO' : 'GARIS RELASI' }}
+                  </div>
+                  <div class="text-xs font-mono opacity-50">ID: {{ selectedGraphItem.id }}</div>
+                  <div class="text-sm leading-relaxed p-3 neo-box-sm">
+                    {{ selectedGraphItem.content || selectedGraphItem.title }}
+                  </div>
+                  <div v-if="selectedGraphItem.created_at" class="text-xs font-mono opacity-60">
+                    Timestamp: {{ selectedGraphItem.created_at }}
+                  </div>
+                </div>
+                <div v-else class="text-xs opacity-50 leading-relaxed">
+                  Klik salah satu node (kotak) atau garis relasi pada graf untuk memeriksa isi catatan asli dan alasan relasi.
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- =========================================================
+           DRAWER / MODAL: JEJAK AUDIT & PROVENANCE
+           ========================================================= -->
+      <div
+        v-if="showProvenanceModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="background: rgba(0, 0, 0, 0.75);"
+      >
+        <div class="neo-box p-6 w-full max-w-3xl max-h-[85vh] flex flex-col gap-4 overflow-hidden">
+          <div class="flex items-center justify-between border-b pb-3" style="border-color: var(--border-color);">
+            <div>
+              <span class="text-xs font-mono font-bold uppercase" style="color: var(--accent-1);">JEJAK AUDIT & PROVENANCE (IMMUTABLE NOTES)</span>
+              <h3 class="text-base font-black uppercase">{{ activeProvenanceInsight.title }}</h3>
+            </div>
+            <button @click="showProvenanceModal = false" class="neo-btn text-xs py-1 px-2 font-mono">✕ TUTUP</button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto flex flex-col gap-3 pr-2">
+            <div class="text-xs font-mono opacity-70">
+              Berikut adalah {{ activeProvenanceInsight.source_notes.length }} catatan mikro asli dari tabel `micro_notes` yang menjadi rujukan pembentukan insight ini:
+            </div>
+
+            <div
+              v-for="(n, idx) in activeProvenanceInsight.source_notes"
+              :key="n.id"
+              class="neo-box-sm p-4 flex flex-col gap-2"
+            >
+              <div class="flex items-center justify-between text-xs font-mono opacity-60">
+                <span>Catatan #{{ idx + 1 }} · {{ n.source || 'cintamani-web' }}</span>
+                <span>{{ n.created_at }}</span>
+              </div>
+              <div class="text-sm font-medium whitespace-pre-wrap leading-relaxed">
+                {{ n.content }}
+              </div>
+              <div class="text-xs font-mono opacity-40">UUID: {{ n.id }}</div>
+            </div>
+
+            <div v-if="activeProvenanceInsight.source_notes.length === 0" class="text-xs opacity-50 p-4 text-center">
+              Tidak ada catatan sumber yang terlampir.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           MODAL: CONFIG & BEARER TOKEN SETTINGS
+           ========================================================= -->
+      <div
+        v-if="showSettingsModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="background: rgba(0, 0, 0, 0.75);"
+      >
+        <div class="neo-box p-6 w-full max-w-lg flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b pb-3" style="border-color: var(--border-color);">
+            <h3 class="text-base font-black uppercase">PENGATURAN HOME SERVER & TOKEN</h3>
+            <button @click="showSettingsModal = false" class="neo-btn text-xs py-1 px-2 font-mono">✕</button>
+          </div>
+
+          <div class="flex flex-col gap-3 text-xs">
+            <!-- Bearer Token Input -->
+            <div class="flex flex-col gap-1">
+              <label class="font-mono font-bold uppercase">BEARER API TOKEN (cintamani-android / Web):</label>
+              <input
+                type="text"
+                v-model="inputToken"
+                class="neo-input font-mono text-xs"
+                placeholder="cm_live_..."
+              />
+              <span class="opacity-60 text-xs">Token ini harus sama dengan yang diisi pada aplikasi Android.</span>
+            </div>
+
+            <!-- Provider Selector -->
+            <div class="flex flex-col gap-1">
+              <label class="font-mono font-bold uppercase">LLM PROVIDER UTAMA:</label>
+              <select v-model="serverConfig.llm_provider" class="neo-input font-mono text-xs">
+                <option value="ollama">Ollama Lokal / LAN</option>
+                <option value="gemini">Google Gemini (Server-side)</option>
+                <option value="openai">OpenAI (GPT-4o-mini)</option>
+                <option value="claude">Anthropic Claude</option>
+              </select>
+            </div>
+
+            <!-- Ollama URL -->
+            <div v-if="serverConfig.llm_provider === 'ollama'" class="flex flex-col gap-1">
+              <label class="font-mono font-bold uppercase">OLLAMA BASE URL:</label>
+              <input
+                type="text"
+                v-model="serverConfig.ollama_base_url"
+                class="neo-input font-mono text-xs"
+                placeholder="http://localhost:11434"
+              />
+            </div>
+
+            <!-- LLM Model Name -->
+            <div class="flex flex-col gap-1">
+              <label class="font-mono font-bold uppercase">NAMA MODEL LLM:</label>
+              <input
+                type="text"
+                v-model="serverConfig.llm_model"
+                class="neo-input font-mono text-xs"
+                placeholder="qwen2.5:7b / gemini-3.8-flash"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-3 border-t" style="border-color: var(--border-color);">
+            <button @click="showSettingsModal = false" class="neo-btn text-xs py-2 px-3">BATAL</button>
+            <button @click="saveSettings" class="neo-btn neo-btn-accent1 text-xs py-2 px-4">SIMPAN PENGATURAN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Application Orchestration Script -->
+    <script src="/js/themes.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+  </body>
+</html>

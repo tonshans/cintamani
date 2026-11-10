@@ -1,0 +1,1 @@
+"""Cintamani Core Package."""

@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+data/*.duckdb
+data/*.duckdb.wal
+data/*.duckdb.v69-backup
+data/config.json
+data/cintamani_v69_backup.json
+.env*
+!.env.example
+__pycache__

@@ -1,0 +1,6 @@
+{
+  "name": "Cintamani Home Brain",
+  "description": "Personal AI Knowledge Graph, Home Server & Cognitive Neo-Brutalism Exploration Dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

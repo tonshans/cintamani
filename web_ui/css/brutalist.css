@@ -1,0 +1,296 @@
+/* ===================================================================
+   CINTAMANI // COGNITIVE NEO-BRUTALISM DESIGN SYSTEM
+   Strict 3px-4px borders, hard-drop solid shadows, tactile button physics,
+   and 4 domain-native color palettes.
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* -------------------------------------------------------------
+   THEME PALETTES (PRD Section 4.1)
+   ------------------------------------------------------------- */
+
+/* 1. Cognitive Terminal (Dark - Default) */
+:root, [data-theme="terminal"] {
+  --bg-canvas: #18181A;
+  --bg-surface: #09090B;
+  --bg-surface-elevated: #1F1F23;
+  --border-color: #F1F5F9;
+  --text-main: #F1F5F9;
+  --text-muted: #94A3B8;
+  --accent-1: #4ADE80; /* Cyber Mint */
+  --accent-1-text: #09090B;
+  --accent-2: #A78BFA; /* Electric Lavender */
+  --accent-2-text: #09090B;
+  --danger: #F87171;
+  --danger-text: #09090B;
+  --shadow-color: #000000;
+  --badge-bg: #27272A;
+}
+
+/* 2. The Architect's Draft (Light) */
+[data-theme="draft"] {
+  --bg-canvas: #F4F4F0;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #E5E5E0;
+  --border-color: #111111;
+  --text-main: #111111;
+  --text-muted: #555555;
+  --accent-1: #81A1C1; /* Blueprint Blue */
+  --accent-1-text: #FFFFFF;
+  --accent-2: #E5FE54; /* Highlighter Yellow */
+  --accent-2-text: #111111;
+  --danger: #E06C75;
+  --danger-text: #FFFFFF;
+  --shadow-color: #111111;
+  --badge-bg: #EAEAE4;
+}
+
+/* 3. Industrial Archive (Light) */
+[data-theme="archive"] {
+  --bg-canvas: #E8E4D9;
+  --bg-surface: #F5F5F0;
+  --bg-surface-elevated: #DDD8CB;
+  --border-color: #1C1917;
+  --text-main: #1C1917;
+  --text-muted: #57534E;
+  --accent-1: #A3B18A; /* Olive Green */
+  --accent-1-text: #1C1917;
+  --accent-2: #FF6B35; /* Safety Orange */
+  --accent-2-text: #FFFFFF;
+  --danger: #DC2626;
+  --danger-text: #FFFFFF;
+  --shadow-color: #1C1917;
+  --badge-bg: #E0DDD0;
+}
+
+/* 4. Midnight Blueprint (Dark) */
+[data-theme="blueprint"] {
+  --bg-canvas: #0F172A;
+  --bg-surface: #1E293B;
+  --bg-surface-elevated: #334155;
+  --border-color: #94A3B8;
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --accent-1: #22D3EE; /* Architect Cyan */
+  --accent-1-text: #0F172A;
+  --accent-2: #FB7185; /* Coral Pink */
+  --accent-2-text: #0F172A;
+  --danger: #F43F5E;
+  --danger-text: #FFFFFF;
+  --shadow-color: #020617;
+  --badge-bg: #334155;
+}
+
+/* -------------------------------------------------------------
+   GLOBAL BASE
+   ------------------------------------------------------------- */
+*, ::before, ::after {
+  box-sizing: border-box;
+  border-radius: 0px !important; /* Strict Neo-Brutalism Zero Radius */
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+.font-mono, code, pre, .mono-nums {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------
+   NEO-BRUTALIST ATOMIC UTILITIES
+   ------------------------------------------------------------- */
+.neo-box {
+  background-color: var(--bg-surface);
+  border: 3px solid var(--border-color);
+  box-shadow: 5px 5px 0px var(--border-color);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.neo-box-sm {
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border-color);
+  box-shadow: 3px 3px 0px var(--border-color);
+}
+
+.neo-btn {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 3px solid var(--border-color);
+  box-shadow: 4px 4px 0px var(--border-color);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neo-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0px var(--border-color);
+}
+
+.neo-btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0px var(--border-color);
+}
+
+.neo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: 2px 2px 0px var(--border-color);
+}
+
+/* Accent Button Variants */
+.neo-btn-accent1 {
+  background-color: var(--accent-1);
+  color: var(--accent-1-text);
+}
+
+.neo-btn-accent2 {
+  background-color: var(--accent-2);
+  color: var(--accent-2-text);
+}
+
+.neo-btn-danger {
+  background-color: var(--danger);
+  color: var(--danger-text);
+}
+
+/* Input Fields */
+.neo-input {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 3px solid var(--border-color);
+  box-shadow: 3px 3px 0px var(--border-color);
+  padding: 8px 12px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.neo-input:focus {
+  background-color: var(--bg-surface-elevated);
+  box-shadow: 4px 4px 0px var(--accent-1);
+  border-color: var(--border-color);
+}
+
+/* Tag / Badge - Unboxed Neo Brutalist */
+.neo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1.5px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  background-color: var(--badge-bg);
+}
+
+/* -------------------------------------------------------------
+   MARKDOWN READER BODY
+   ------------------------------------------------------------- */
+.markdown-body {
+  color: var(--text-main);
+  line-height: 1.7;
+}
+
+.markdown-body h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 3px solid var(--border-color);
+  color: var(--accent-1);
+}
+
+.markdown-body h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1.4rem;
+  margin-bottom: 0.6rem;
+  color: var(--accent-2);
+}
+
+.markdown-body h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.markdown-body p {
+  margin-bottom: 0.9rem;
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-body li {
+  margin-bottom: 0.35rem;
+}
+
+.markdown-body code {
+  background-color: var(--bg-surface-elevated);
+  padding: 2px 6px;
+  border: 1px solid var(--border-color);
+  font-size: 0.85em;
+}
+
+.markdown-body pre {
+  background-color: var(--bg-surface-elevated);
+  border: 2px solid var(--border-color);
+  box-shadow: 3px 3px 0px var(--border-color);
+  padding: 12px;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--accent-1);
+  padding-left: 1rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+  border-left: 2px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-1);
+}

@@ -1,0 +1,9 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+# shortcut: pinned <2.0.0 because 2.x wheels require AVX2 (SIGILL on AVX-only CPUs)
+# and write a storage format 1.x cannot read back. Upgrade once every node has AVX2.
+duckdb>=1.0.0,<2.0.0
+pydantic>=2.7.0
+httpx>=0.27.0
+python-multipart>=0.0.9
+pytz>=2024.1
