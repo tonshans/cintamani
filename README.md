@@ -1,4 +1,4 @@
-# Cintamani: The Intelligence Brain & Home Server
+# Cintamani
 
 *Capture Everything. Connect Ideas. Discover More.*
 
@@ -63,6 +63,17 @@ Mengapa Anda sangat membutuhkan fitur ini? Karena sering kali, kita terlalu sibu
   ollama run qwen2.5:7b           # Model LLM untuk analisis logika
   ollama pull nomic-embed-text    # Model embedding untuk pencarian semantik
   ```
+- Atau jika ingin menggunakan provider LLM komersial bisa di seting lewat Web UI atau
+```bash
+# Contoh Pakai DeepSeek
+python manage_token.py --set-provider openai_compatible \
+  --set-llm-url https://api.deepseek.com/v1 --set-api-key sk-xxx \
+  --set-ollama-model deepseek-chat
+python manage_token.py --set-embedding-provider openai_compatible \
+  --set-embedding-model text-embedding-3-small
+python reembed.py
+```
+
 
 ### 2. Instalasi Repositori
 

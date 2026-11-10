@@ -9,6 +9,5 @@ data/*.duckdb.wal
 data/*.duckdb.v69-backup
 data/config.json
 data/cintamani_v69_backup.json
-.env*
-!.env.example
+.env
 __pycache__
