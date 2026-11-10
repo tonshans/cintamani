@@ -14,6 +14,24 @@ from typing import Any, Dict
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 CONFIG_FILE = DATA_DIR / "config.json"
+ENV_FILE = BASE_DIR / ".env"
+
+
+def load_dotenv(path: Path = ENV_FILE) -> None:
+    """Loads KEY=VALUE pairs from .env into os.environ (existing env wins)."""
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
+
+
+load_dotenv()
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "server_name": "Cintamani Home Brain",
@@ -21,7 +39,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "port": 3000,
     "api_token": "",
     "duckdb_path": "data/cintamani_brain.duckdb",
-    "llm_provider": "ollama",  # "ollama" | "gemini" | "openai" | "claude"
+    "llm_provider": "ollama",  # "ollama" | "openai" | "openai_compatible" | "gemini" | "claude"
+    "llm_base_url": os.environ.get("LLM_BASE_URL", ""),
+    "llm_api_key": os.environ.get("LLM_API_KEY", ""),
     "ollama_base_url": os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
     "llm_model": "qwen2.5:7b",
     "embedding_provider": "ollama",
@@ -30,6 +50,16 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
     "openai_api_key": os.environ.get("OPENAI_API_KEY", ""),
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "")
+}
+
+# Env vars override config.json on every load.
+ENV_OVERRIDES = {
+    "GEMINI_API_KEY": "gemini_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
+    "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "LLM_API_KEY": "llm_api_key",
+    "LLM_BASE_URL": "llm_base_url",
+    "OLLAMA_BASE_URL": "ollama_base_url",
 }
 
 
@@ -73,9 +103,10 @@ class ConfigManager:
             if not merged.get("api_token"):
                 merged["api_token"] = generate_secure_token()
 
-            # Sync environment variables if present
-            if os.environ.get("GEMINI_API_KEY"):
-                merged["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
+            # Sync environment variables if present (env wins over file)
+            for env_name, cfg_key in ENV_OVERRIDES.items():
+                if os.environ.get(env_name):
+                    merged[cfg_key] = os.environ[env_name]
 
             self._config = merged
             self.save()
@@ -121,6 +152,10 @@ class ConfigManager:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(self._config, f, indent=2)
+        try:
+            os.chmod(CONFIG_FILE, 0o600)  # config may hold API keys
+        except OSError:
+            pass
 
 
 def get_config() -> ConfigManager:

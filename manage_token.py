@@ -42,8 +42,29 @@ def main():
     parser.add_argument(
         "--set-provider",
         type=str,
-        choices=["ollama", "gemini", "openai", "claude"],
+        choices=["ollama", "openai", "openai_compatible", "gemini", "claude"],
         help="Set the primary LLM provider",
+    )
+    parser.add_argument(
+        "--set-llm-url",
+        type=str,
+        help="Set LLM base URL (e.g. https://api.deepseek.com/v1)",
+    )
+    parser.add_argument(
+        "--set-api-key",
+        type=str,
+        help="Set the generic LLM API key (llm_api_key)",
+    )
+    parser.add_argument(
+        "--set-embedding-provider",
+        type=str,
+        choices=["ollama", "openai", "openai_compatible", "gemini"],
+        help="Set the embedding provider",
+    )
+    parser.add_argument(
+        "--set-embedding-model",
+        type=str,
+        help="Set the embedding model name (e.g. text-embedding-3-small)",
     )
     parser.add_argument(
         "--set-port",
@@ -73,6 +94,22 @@ def main():
         cfg.set("llm_provider", args.set_provider)
         print(f"[+] Primary LLM provider set to: {args.set_provider}")
 
+    if args.set_llm_url:
+        cfg.set("llm_base_url", args.set_llm_url)
+        print(f"[+] LLM base URL updated to: {args.set_llm_url}")
+
+    if args.set_api_key:
+        cfg.set("llm_api_key", args.set_api_key)
+        print("[+] LLM API key updated.")
+
+    if args.set_embedding_provider:
+        cfg.set("embedding_provider", args.set_embedding_provider)
+        print(f"[+] Embedding provider set to: {args.set_embedding_provider}")
+
+    if args.set_embedding_model:
+        cfg.set("embedding_model", args.set_embedding_model)
+        print(f"[+] Embedding model updated to: {args.set_embedding_model}")
+
     if args.set_port:
         cfg.set("port", args.set_port)
         print(f"[+] Server port updated to: {args.set_port}")
@@ -87,7 +124,11 @@ def main():
         print(f" Active Token    : {all_cfg.get('api_token')}")
         print(f" LLM Provider    : {all_cfg.get('llm_provider')}")
         print(f" LLM Model       : {all_cfg.get('llm_model')}")
+        print(f" LLM Base URL    : {all_cfg.get('llm_base_url') or '(default provider)'}")
+        key = all_cfg.get("llm_api_key") or ""
+        print(f" LLM API Key     : {'***' + key[-4:] if key else '(belum diisi)'}")
         print(f" Ollama Base URL : {all_cfg.get('ollama_base_url')}")
+        print(f" Embedding Prov. : {all_cfg.get('embedding_provider')}")
         print(f" Embedding Model : {all_cfg.get('embedding_model')}")
         print(f" DuckDB Path     : {all_cfg.get('duckdb_path')}")
         print("=======================================================\n")

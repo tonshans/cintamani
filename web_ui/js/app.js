@@ -49,8 +49,12 @@ createApp({
       serverConfig: {
         server_name: "Cintamani Home Brain",
         llm_provider: "ollama",
+        llm_base_url: "",
+        llm_api_key: "",
         ollama_base_url: "http://localhost:11434",
         llm_model: "qwen2.5:7b",
+        embedding_provider: "ollama",
+        embedding_model: "nomic-embed-text",
       },
       graphNetwork: null,
       selectedGraphItem: null,
@@ -426,8 +430,12 @@ createApp({
         this.serverConfig = {
           server_name: cfg.server_name,
           llm_provider: cfg.llm_provider,
+          llm_base_url: cfg.llm_base_url || "",
+          llm_api_key: "",
           ollama_base_url: cfg.ollama_base_url,
           llm_model: cfg.llm_model,
+          embedding_provider: cfg.embedding_provider || "ollama",
+          embedding_model: cfg.embedding_model || "",
         };
       } catch (err) {}
     },
@@ -438,11 +446,19 @@ createApp({
       }
 
       try {
-        await window.api.updateServerConfig({
+        const updates = {
           llm_provider: this.serverConfig.llm_provider,
+          llm_base_url: this.serverConfig.llm_base_url,
           ollama_base_url: this.serverConfig.ollama_base_url,
           llm_model: this.serverConfig.llm_model,
-        });
+          embedding_provider: this.serverConfig.embedding_provider,
+          embedding_model: this.serverConfig.embedding_model,
+        };
+        if (this.serverConfig.llm_api_key.trim()) {
+          updates.llm_api_key = this.serverConfig.llm_api_key.trim();
+        }
+        await window.api.updateServerConfig(updates);
+        this.serverConfig.llm_api_key = "";
         this.showSettingsModal = false;
         this.notify("Pengaturan dan Token berhasil disimpan!", "info");
         await this.refreshAll();

@@ -1,13 +1,14 @@
 """
 Cintamani Multi-Provider LLM & Embedding Client.
-Communicates with Local/Remote Ollama, Google Gemini, OpenAI, and Anthropic Claude
-using lightweight pure httpx.
+Communicates with Ollama, any OpenAI-compatible API (OpenAI, DeepSeek, OpenRouter,
+Groq, Together, LM Studio), Google Gemini, and Anthropic Claude using pure httpx.
 Includes Time-Aware System Prompt builder and graceful offline fallback.
 """
 
 from __future__ import annotations
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -15,6 +16,39 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from app.core.config import get_config
+
+logger = logging.getLogger("cintamani.llm")
+
+DEFAULT_BASE_URLS = {
+    "openai": "https://api.openai.com/v1",
+    "openai_compatible": "",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta",
+    "claude": "https://api.anthropic.com/v1",
+}
+
+DEFAULT_MODELS = {
+    "ollama": "qwen2.5:7b",
+    "openai": "gpt-4o-mini",
+    "openai_compatible": "",
+    "gemini": "gemini-2.5-flash",
+    "claude": "claude-sonnet-4-5",
+}
+
+DEFAULT_EMBEDDING_MODELS = {
+    "ollama": "nomic-embed-text",
+    "openai": "text-embedding-3-small",
+    "openai_compatible": "text-embedding-3-small",
+    "gemini": "text-embedding-004",
+}
+
+KEY_FIELDS = {
+    "openai": "openai_api_key",
+    "openai_compatible": "openai_api_key",
+    "gemini": "gemini_api_key",
+    "claude": "anthropic_api_key",
+}
+
+SUPPORTED_EMBEDDING_PROVIDERS = {"ollama", "openai", "openai_compatible", "gemini"}
 
 
 def build_time_aware_system_prompt(
@@ -50,7 +84,7 @@ def build_time_aware_system_prompt(
 
 class OllamaClient:
     """
-    Client for Ollama and commercial providers (Gemini, OpenAI, Claude).
+    Client for Ollama, OpenAI-compatible APIs, Gemini, and Claude.
     Defaults to configuration in data/config.json.
     """
 
@@ -63,16 +97,40 @@ class OllamaClient:
         return self.config.get("llm_provider", "ollama").lower()
 
     @property
+    def embedding_provider(self) -> str:
+        return (self.config.get("embedding_provider") or self.provider).lower()
+
+    @property
     def base_url(self) -> str:
         return self.config.get("ollama_base_url", "http://localhost:11434").rstrip("/")
 
+    def _base_for(self, provider: str) -> str:
+        """Base URL for a provider: explicit llm_base_url wins, else provider default."""
+        configured = (self.config.get("llm_base_url") or "").strip().rstrip("/")
+        return configured or DEFAULT_BASE_URLS.get(provider, "")
+
+    def _key_for(self, provider: str) -> str:
+        """API key: generic llm_api_key wins, then provider-specific field, then env."""
+        generic = (self.config.get("llm_api_key") or "").strip()
+        field = KEY_FIELDS.get(provider, "")
+        specific = (self.config.get(field) or "").strip() if field else ""
+        return generic or specific or os.environ.get("LLM_API_KEY", "").strip()
+
     @property
     def model_name(self) -> str:
-        return self.config.get("llm_model", "qwen2.5:7b")
+        value = (self.config.get("llm_model") or "").strip()
+        # Switching provider in the UI keeps the old model name; use the provider
+        # default instead of sending e.g. qwen2.5:7b to OpenAI.
+        if self.provider != "ollama" and value in ("", DEFAULT_MODELS["ollama"]):
+            return DEFAULT_MODELS.get(self.provider, value)
+        return value or DEFAULT_MODELS.get(self.provider, "")
 
     @property
     def embedding_model(self) -> str:
-        return self.config.get("embedding_model", "nomic-embed-text")
+        value = (self.config.get("embedding_model") or "").strip()
+        if self.embedding_provider != "ollama" and value in ("", DEFAULT_EMBEDDING_MODELS["ollama"]):
+            return DEFAULT_EMBEDDING_MODELS.get(self.embedding_provider, value)
+        return value or DEFAULT_EMBEDDING_MODELS.get(self.embedding_provider, "")
 
     @property
     def embedding_dim(self) -> int:
@@ -88,39 +146,38 @@ class OllamaClient:
         """
         provider = self.provider
 
+        if provider in ("openai", "openai_compatible"):
+            if not self._key_for(provider):
+                return False, "API key LLM belum dikonfigurasi (llm_api_key / OPENAI_API_KEY)."
+            if not self._base_for(provider):
+                return False, "llm_base_url belum dikonfigurasi untuk provider openai_compatible."
+            return True, f"OpenAI-compatible {self._base_for(provider)} (Active: {self.model_name})"
+
         if provider == "gemini":
-            api_key = self.config.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
-            if not api_key:
+            if not self._key_for(provider):
                 return False, "GEMINI_API_KEY belum dikonfigurasi."
-            return True, f"Google Gemini (Active: {self.config.get('llm_model', 'gemini-3.8-flash')})"
+            return True, f"Google Gemini (Active: {self.model_name})"
 
-        elif provider == "openai":
-            api_key = self.config.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                return False, "OPENAI_API_KEY belum dikonfigurasi."
-            return True, f"OpenAI (Active: {self.config.get('llm_model', 'gpt-4o-mini')})"
-
-        elif provider == "claude":
-            api_key = self.config.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
+        if provider == "claude":
+            if not self._key_for(provider):
                 return False, "ANTHROPIC_API_KEY belum dikonfigurasi."
-            return True, f"Anthropic Claude (Active: {self.config.get('llm_model', 'claude-3-5-sonnet')})"
+            return True, f"Anthropic Claude (Active: {self.model_name})"
 
-        else:  # Ollama default
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    resp = await client.get(f"{self.base_url}/api/tags")
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        models = [m.get("name") for m in data.get("models", [])]
-                        has_model = any(self.model_name in m for m in models)
-                        status_str = f"Ollama aktif di {self.base_url} ({len(models)} model tersedia)"
-                        if not has_model and models:
-                            status_str += f" - Peringatan: model '{self.model_name}' belum di-pull."
-                        return True, status_str
-                    return False, f"Ollama merespons status code {resp.status_code}"
-            except Exception as e:
-                return False, f"Ollama tidak terjangkau di {self.base_url}: {str(e)}"
+        # Ollama default
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.get(f"{self.base_url}/api/tags")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = [m.get("name") for m in data.get("models", [])]
+                    has_model = any(self.model_name in m for m in models)
+                    status_str = f"Ollama aktif di {self.base_url} ({len(models)} model tersedia)"
+                    if not has_model and models:
+                        status_str += f" - Peringatan: model '{self.model_name}' belum di-pull."
+                    return True, status_str
+                return False, f"Ollama merespons status code {resp.status_code}"
+        except Exception as e:
+            return False, f"Ollama tidak terjangkau di {self.base_url}: {str(e)}"
 
     # -------------------------------------------------------------
     # Embeddings Generation
@@ -128,49 +185,72 @@ class OllamaClient:
     async def generate_embedding(self, text: str) -> List[float]:
         """
         Generates semantic embedding vector for a note text.
-        Supports Ollama, Gemini, OpenAI, with deterministic fallback if offline.
+        Supports Ollama, OpenAI-compatible, Gemini, with deterministic fallback if offline.
         """
-        provider = self.config.get("embedding_provider", self.provider).lower()
+        provider = self.embedding_provider
 
-        # 1. Ollama Embedding
-        if provider == "ollama":
-            try:
+        try:
+            if provider == "ollama":
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     resp = await client.post(
                         f"{self.base_url}/api/embeddings",
                         json={"model": self.embedding_model, "prompt": text},
                     )
                     if resp.status_code == 200:
-                        data = resp.json()
-                        emb = data.get("embedding")
+                        emb = resp.json().get("embedding")
                         if emb and isinstance(emb, list):
                             return emb
-            except Exception:
-                pass
+                    logger.warning("Ollama embedding gagal: HTTP %s", resp.status_code)
 
-        # 2. Gemini Embedding
-        elif provider == "gemini":
-            api_key = self.config.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
-            if api_key:
-                try:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+            elif provider == "gemini":
+                api_key = self._key_for(provider)
+                if api_key:
+                    base = self._base_for(provider)
+                    url = f"{base}/models/{self.embedding_model}:embedContent?key={api_key}"
                     async with httpx.AsyncClient(timeout=self.timeout) as client:
                         resp = await client.post(
                             url,
                             json={
-                                "model": "models/text-embedding-004",
+                                "model": f"models/{self.embedding_model}",
                                 "content": {"parts": [{"text": text}]},
                             },
                         )
                         if resp.status_code == 200:
-                            data = resp.json()
-                            values = data.get("embedding", {}).get("values")
+                            values = resp.json().get("embedding", {}).get("values")
                             if values and isinstance(values, list):
                                 return values
-                except Exception:
-                    pass
+                        logger.warning("Gemini embedding gagal: HTTP %s", resp.status_code)
+                else:
+                    logger.warning("Gemini embedding dipilih tapi GEMINI_API_KEY kosong.")
 
-        # 3. Deterministic Lightweight Fallback (Bag of Words / Hash Projection)
+            elif provider in ("openai", "openai_compatible"):
+                api_key = self._key_for(provider)
+                base = self._base_for(provider)
+                if not api_key or not base:
+                    logger.warning(
+                        "Embedding provider=%s but key/base_url missing.", provider
+                    )
+                else:
+                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+                        resp = await client.post(
+                            f"{base}/embeddings",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            json={"model": self.embedding_model, "input": text},
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json().get("data") or []
+                            if data and data[0].get("embedding"):
+                                return data[0]["embedding"]
+                        logger.warning("Embedding %s gagal: HTTP %s", provider, resp.status_code)
+
+            else:
+                logger.warning(
+                    "Provider embedding '%s' tidak didukung, memakai hash fallback.", provider
+                )
+        except Exception as e:
+            logger.warning("Embedding provider=%s gagal: %s", provider, e)
+
+        # Deterministic Lightweight Fallback (Bag of Words / Hash Projection)
         # Guarantees that vector search and clustering work smoothly even without GPU/Ollama
         return self._generate_fallback_embedding(text, dim=self.embedding_dim)
 
@@ -195,6 +275,98 @@ class OllamaClient:
         return vec
 
     # -------------------------------------------------------------
+    # Provider-specific completion helpers
+    # -------------------------------------------------------------
+    async def _ollama_completion(
+        self, prompt: str, system_prompt: Optional[str], model: str
+    ) -> str:
+        payload: Dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
+        if system_prompt:
+            payload["system"] = system_prompt
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(f"{self.base_url}/api/generate", json=payload)
+            resp.raise_for_status()
+            return resp.json().get("response", "").strip()
+
+    async def _gemini_completion(
+        self, prompt: str, system_prompt: Optional[str], model: str
+    ) -> str:
+        api_key = self._key_for("gemini")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY belum dikonfigurasi.")
+        url = f"{self._base_for('gemini')}/models/{model}:generateContent?key={api_key}"
+        contents = []
+        if system_prompt:
+            contents.append({"role": "user", "parts": [{"text": f"SYSTEM INSTRUCTION: {system_prompt}"}]})
+            contents.append({"role": "model", "parts": [{"text": "Dimengerti. Saya akan mematuhi instruksi sistem tersebut."}]})
+        contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json={"contents": contents},
+            )
+            resp.raise_for_status()
+            candidates = resp.json().get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                return "".join(p.get("text", "") for p in parts).strip()
+            return ""
+
+    async def _openai_completion(
+        self, prompt: str, system_prompt: Optional[str], model: str
+    ) -> str:
+        provider = self.provider
+        api_key = self._key_for(provider)
+        base = self._base_for(provider)
+        if not api_key:
+            raise ValueError("API key LLM belum dikonfigurasi.")
+        if not base:
+            raise ValueError("llm_base_url belum dikonfigurasi.")
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(
+                f"{base}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"model": model, "messages": messages},
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+    async def _anthropic_completion(
+        self, prompt: str, system_prompt: Optional[str], model: str
+    ) -> str:
+        api_key = self._key_for("claude")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY belum dikonfigurasi.")
+        payload: Dict[str, Any] = {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(
+                f"{self._base_for('claude')}/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json=payload,
+            )
+            resp.raise_for_status()
+            blocks = resp.json().get("content", [])
+            return "".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
+
+    # -------------------------------------------------------------
     # Text Completion & Generation
     # -------------------------------------------------------------
     async def generate_completion(
@@ -203,79 +375,24 @@ class OllamaClient:
         system_prompt: Optional[str] = None,
         model: Optional[str] = None,
     ) -> str:
-        """Generates completion text from configured LLM provider."""
+        """Generates completion text from the configured LLM provider."""
         provider = self.provider
         target_model = model or self.model_name
 
-        # 1. Ollama Provider
-        if provider == "ollama":
-            try:
-                payload = {
-                    "model": target_model,
-                    "prompt": prompt,
-                    "stream": False,
-                }
-                if system_prompt:
-                    payload["system"] = system_prompt
-
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    resp = await client.post(
-                        f"{self.base_url}/api/generate", json=payload
-                    )
-                    if resp.status_code == 200:
-                        return resp.json().get("response", "").strip()
-            except Exception as e:
-                # Fallback to Gemini if key available or generate rule-based response
-                pass
-
-        # 2. Google Gemini Provider
-        if provider == "gemini" or os.environ.get("GEMINI_API_KEY"):
-            api_key = self.config.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
-            if api_key:
-                try:
-                    gemini_model = "gemini-3.8-flash"
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
-                    contents = []
-                    if system_prompt:
-                        contents.append({"role": "user", "parts": [{"text": f"SYSTEM INSTRUCTION: {system_prompt}"}]})
-                        contents.append({"role": "model", "parts": [{"text": "Dimengerti. Saya akan mematuhi instruksi sistem tersebut."}]})
-                    contents.append({"role": "user", "parts": [{"text": prompt}]})
-
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        resp = await client.post(
-                            url,
-                            headers={"Content-Type": "application/json", "User-Agent": "aistudio-build"},
-                            json={"contents": contents},
-                        )
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            candidates = data.get("candidates", [])
-                            if candidates:
-                                parts = candidates[0].get("content", {}).get("parts", [])
-                                return "".join(p.get("text", "") for p in parts).strip()
-                except Exception:
-                    pass
-
-        # 3. OpenAI Provider
-        if provider == "openai":
-            api_key = self.config.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
-            if api_key:
-                try:
-                    messages = []
-                    if system_prompt:
-                        messages.append({"role": "system", "content": system_prompt})
-                    messages.append({"role": "user", "content": prompt})
-
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        resp = await client.post(
-                            "https://api.openai.com/v1/chat/completions",
-                            headers={"Authorization": f"Bearer {api_key}"},
-                            json={"model": target_model or "gpt-4o-mini", "messages": messages},
-                        )
-                        if resp.status_code == 200:
-                            return resp.json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    pass
+        try:
+            if provider == "ollama":
+                return await self._ollama_completion(prompt, system_prompt, target_model)
+            if provider == "gemini":
+                return await self._gemini_completion(prompt, system_prompt, target_model)
+            if provider in ("openai", "openai_compatible"):
+                return await self._openai_completion(prompt, system_prompt, target_model)
+            if provider == "claude":
+                return await self._anthropic_completion(prompt, system_prompt, target_model)
+            raise ValueError(f"Provider LLM tidak dikenal: {provider}")
+        except Exception as e:
+            logger.warning(
+                "LLM gagal (provider=%s, model=%s): %s", provider, target_model, e
+            )
 
         # Fallback offline synthesis if LLM is unreachable
         return f"[Analisis Sintesis Otomatis]\nBerdasarkan data catatan yang dievaluasi:\n{prompt[:300]}..."

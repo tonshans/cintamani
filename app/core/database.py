@@ -547,6 +547,24 @@ Ditemukan benang merah kuat antara eksperimen radio LoRa dan arsitektur database
 
         return [{"id": r[0], "content": r[1], "created_at": str(r[2])} for r in rows]
 
+    def get_stale_embedding_notes(
+        self, model_name: str, embedding_dim: int, limit: int = 200
+    ) -> List[Dict[str, Any]]:
+        """Finds notes whose stored embedding used a different model or dimension."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT n.id, n.content
+                FROM micro_notes n
+                JOIN vector_index v ON n.id = v.note_id
+                WHERE COALESCE(v.model_name, '') != ? OR v.embedding_dim != ?
+                LIMIT ?
+                """,
+                [model_name, embedding_dim, limit],
+            ).fetchall()
+
+        return [{"id": r[0], "content": r[1]} for r in rows]
+
     def save_embedding(
         self, note_id: str, embedding: List[float], model_name: str
     ) -> None:

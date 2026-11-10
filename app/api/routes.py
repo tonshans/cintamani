@@ -31,6 +31,9 @@ from app.core.security import verify_api_token
 
 router = APIRouter(prefix="/api/v1", tags=["Cintamani API"])
 TIME_MODE_PATTERN = "^(all_time|last_7_days|last_30_days|this_year|custom_range)$"
+VALID_LLM_PROVIDERS = {"ollama", "openai", "openai_compatible", "gemini", "claude"}
+VALID_EMBEDDING_PROVIDERS = {"ollama", "openai", "openai_compatible", "gemini"}
+SECRET_CONFIG_KEYS = {"llm_api_key", "gemini_api_key", "openai_api_key", "anthropic_api_key"}
 
 
 # -----------------------------------------------------------------
@@ -371,9 +374,13 @@ async def get_server_config(token: str = Depends(verify_api_token)):
         "host": cfg.get("host"),
         "port": cfg.get("port"),
         "llm_provider": cfg.get("llm_provider"),
+        "llm_base_url": cfg.get("llm_base_url"),
         "ollama_base_url": cfg.get("ollama_base_url"),
         "llm_model": cfg.get("llm_model"),
+        "embedding_provider": cfg.get("embedding_provider"),
         "embedding_model": cfg.get("embedding_model"),
+        "embedding_dim": cfg.get("embedding_dim"),
+        "has_llm_key": bool(cfg.get("llm_api_key")),
         "has_gemini_key": bool(cfg.get("gemini_api_key")),
         "has_openai_key": bool(cfg.get("openai_api_key")),
         "has_claude_key": bool(cfg.get("anthropic_api_key")),
@@ -389,11 +396,48 @@ async def update_server_config(
     allowed_keys = [
         "server_name",
         "llm_provider",
+        "llm_base_url",
+        "llm_api_key",
         "ollama_base_url",
         "llm_model",
+        "embedding_provider",
         "embedding_model",
+        "embedding_dim",
+        "gemini_api_key",
+        "openai_api_key",
+        "anthropic_api_key",
     ]
     updates = {k: v for k, v in payload.items() if k in allowed_keys}
+    # Never wipe a stored secret with an empty form field.
+    updates = {
+        k: v
+        for k, v in updates.items()
+        if not (k in SECRET_CONFIG_KEYS and not str(v).strip())
+    }
+
+    if "llm_provider" in updates and updates["llm_provider"] not in VALID_LLM_PROVIDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"llm_provider tidak valid. Pilihan: {sorted(VALID_LLM_PROVIDERS)}",
+        )
+    if (
+        "embedding_provider" in updates
+        and updates["embedding_provider"] not in VALID_EMBEDDING_PROVIDERS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"embedding_provider tidak valid. Pilihan: {sorted(VALID_EMBEDDING_PROVIDERS)}",
+        )
+
+    merged = {**cfg.get_all(), **updates}
+    if merged.get("llm_provider") == "openai_compatible" and not (
+        merged.get("llm_base_url") or ""
+    ).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="llm_base_url wajib diisi untuk provider openai_compatible.",
+        )
+
     if updates:
         cfg.update(updates)
-    return {"status": "success", "updated": updates}
+    return {"status": "success", "updated": {k: "***" if k in SECRET_CONFIG_KEYS else v for k, v in updates.items()}}
